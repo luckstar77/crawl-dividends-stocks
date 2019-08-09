@@ -2,6 +2,46 @@ const rp = require('request-promise')
 const cheerio = require('cheerio');
 const _ = require('lodash');
 
+const AWS = require('aws-sdk');
+AWS.config.update({region: 'us-west-2'});
+
+const INTEREST_RATE_SPREAD = parseFloat(process.env.INTEREST_RATE_SPREAD) || 1.02;
+const CS1 = parseFloat(process.env.CS1) || 100;
+const C1 = parseFloat(process.env.C1) || 3;
+
+// Create sendEmail params 
+var params = {
+    Destination: { /* required */
+      CcAddresses: [
+        /* more items */
+      ],
+      ToAddresses: [
+        'luckstar77y@gmail.com',
+        /* more items */
+      ]
+    },
+    Message: { /* required */
+      Body: { /* required */
+        // Html: {
+        //  Charset: "UTF-8",
+        //  Data: "HTML_FORMAT_BODY"
+        // },
+        Text: {
+         Charset: "UTF-8",
+         Data: "TEXT_FORMAT_BODY"
+        }
+       },
+       Subject: {
+        Charset: 'UTF-8',
+        Data: '找出最近2周內100%填權息股票期貨'
+       }
+      },
+    Source: 'luckstar77y@gmail.com', /* required */
+    ReplyToAddresses: [
+      /* more items */
+    ],
+  };
+
 exports.handler = async function(event, context) {
     let $ = cheerio.load(await rp('https://stock-ai.com/taiwan-stocks-ex-right-dividend-information'));
     const hash = $.html().match(/hashText="([^"]*)"/)[1];
@@ -62,7 +102,19 @@ exports.handler = async function(event, context) {
         NumberOfStock: parseInt($(item).children('td').eq(9).text().replace(',','')),
     }));
 
-    console.log(stockFutures);
-}
+    const notificationStocks = parseDividends.reduce((accu, curr) => {
+        for(let stockFuture of stockFutures) {
+            if(curr.symbol !== stockFuture.symbol) continue;
+            if(curr.interestRateSpread < INTEREST_RATE_SPREAD) continue;
+            if(curr.cs1 < CS1) continue;
+            if(curr.c1 < C1) continue;
 
-exports.handler();
+            accu.push({...curr, ...stockFuture});
+            break;
+        }
+        return accu;
+    }, []);
+    params.Message.Body.Text.Data = JSON.stringify(notificationStocks, null, 2);
+    let result = await new AWS.SES({apiVersion: '2010-12-01'}).sendEmail(params).promise();
+    return result;
+}
