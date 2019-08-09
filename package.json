@@ -1,0 +1,13 @@
+{
+  "name": "crawl-dividends-stocks",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "luckstar77 <luckstar77y@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.3",
+    "lodash": "^4.17.15",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.4"
+  }
+}
